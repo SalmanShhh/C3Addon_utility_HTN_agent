@@ -61,6 +61,33 @@
           }
         },
         "actions": {
+          "AddSlotToBuilder": {
+            "list-name": "Coordination: Add Slot To Builder",
+            "display-text": "Add slot {2} at ({3}, {4}) to builder for squad {0}, type {1}",
+            "description": "Adds one slot to the current builder. Call Initialize Slot Builder first.",
+            "params": {
+              "squadId": {
+                "name": "Squad ID",
+                "desc": "Squad identifier."
+              },
+              "slotType": {
+                "name": "Slot Type",
+                "desc": "Slot type name."
+              },
+              "slotId": {
+                "name": "Slot ID",
+                "desc": "Unique slot identifier."
+              },
+              "x": {
+                "name": "X",
+                "desc": "Slot world X position."
+              },
+              "y": {
+                "name": "Y",
+                "desc": "Slot world Y position."
+              }
+            }
+          },
           "AssignAgentToSquad": {
             "list-name": "Coordination: Assign Agent To Squad",
             "display-text": "Assign agent UID {0} to squad {1}",
@@ -126,6 +153,21 @@
               }
             }
           },
+          "InitializeSlotBuilder": {
+            "list-name": "Coordination: Initialize Slot Builder",
+            "display-text": "Initialize slot builder for squad {0}, type {1}",
+            "description": "Starts a new slot collection. Use with Add Slot To Builder then commit with Load Slot Set.",
+            "params": {
+              "squadId": {
+                "name": "Squad ID",
+                "desc": "Squad identifier."
+              },
+              "slotType": {
+                "name": "Slot Type",
+                "desc": "Slot type name."
+              }
+            }
+          },
           "InvalidateSquadPlans": {
             "list-name": "Coordination: Invalidate Squad Plans",
             "display-text": "Invalidate plans for squad {0}",
@@ -184,6 +226,21 @@
               "agentUID": {
                 "name": "Agent UID",
                 "desc": "Source agent UID when scope is Agent UID."
+              }
+            }
+          },
+          "LoadSlotSetFromBuilder": {
+            "list-name": "Coordination: Load Slot Set From Builder",
+            "display-text": "Load slot set to coordination for squad {0}, type {1}",
+            "description": "Commits all slots added via Add Slot To Builder to coordination.",
+            "params": {
+              "squadId": {
+                "name": "Squad ID",
+                "desc": "Squad identifier."
+              },
+              "slotType": {
+                "name": "Slot Type",
+                "desc": "Slot type name."
               }
             }
           },
@@ -434,6 +491,60 @@
               "squadId": {
                 "name": "Squad ID",
                 "desc": "Squad id."
+              }
+            }
+          },
+          "AddTaskToNetworkBuilder": {
+            "list-name": "Setup: Add Task to Network Builder",
+            "display-text": "Add task {0} to network builder {1} (desc: {2}, type: {3})",
+            "description": "Adds one task to the network being built. Specify task ID, description, and type for manager reference.",
+            "params": {
+              "taskId": {
+                "name": "Task ID",
+                "desc": "Unique identifier for this primitive task (e.g., 'patrol', 'chase', 'idle')."
+              },
+              "networkId": {
+                "name": "Network ID",
+                "desc": "Must match the Initialize call."
+              },
+              "description": {
+                "name": "Description",
+                "desc": "Human-readable task description for debugging."
+              },
+              "taskType": {
+                "name": "Task Type",
+                "desc": "primitive, composite, or method.",
+                "items": {
+                  "primitive": "Primitive",
+                  "composite": "Composite",
+                  "method": "Method"
+                }
+              }
+            }
+          },
+          "InitializeTaskNetworkBuilder": {
+            "list-name": "Setup: Initialize Task Network Builder",
+            "display-text": "Initialize task network builder for network {0}",
+            "description": "Starts a new task network definition. Use with Add Task to Builder then commit with Load Task Network.",
+            "params": {
+              "networkId": {
+                "name": "Network ID",
+                "desc": "Unique identifier for this task network (e.g., 'guard', 'patrol', 'boss')."
+              }
+            }
+          },
+          "LoadTaskNetworkFromBuilder": {
+            "list-name": "Setup: Load Task Network from Builder",
+            "display-text": "Load task network {0} from builder, export to key {1}",
+            "description": "Commits all accumulated tasks to a JSON representation and stores in world state for export or manager registration.",
+            "params": {
+              "networkId": {
+                "name": "Network ID",
+                "desc": "Must match Initialize and Add calls."
+              },
+              "exportKey": {
+                "name": "Export Key",
+                "desc": "World state key to store exported JSON (e.g., 'builtNetwork')."
               }
             }
           },

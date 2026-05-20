@@ -1,7 +1,7 @@
 export const config = {
   listName: "Setup: Add Task to Network Builder",
-  displayText: "Add task {0} to network builder for {1}",
-  description: "Adds one task to the network being built. Specify task ID and description for manager reference.",
+  displayText: "Add task {0} to network builder {1} (desc: {2}, type: {3})",
+  description: "Adds one task to the network being built. Specify task ID, description, and type for manager reference.",
   isAsync: false,
   highlight: false,
   isDeprecated: false,

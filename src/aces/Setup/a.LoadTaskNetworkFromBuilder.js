@@ -1,6 +1,6 @@
 export const config = {
   listName: "Setup: Load Task Network from Builder",
-  displayText: "Load task network {0} from builder (exports as JSON string)",
+  displayText: "Load task network {0} from builder, export to key {1}",
   description: "Commits all accumulated tasks to a JSON representation and stores in world state for export or manager registration.",
   isAsync: false,
   highlight: false,

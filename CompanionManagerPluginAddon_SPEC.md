@@ -46,7 +46,7 @@ Each registered agent tracks:
 ## 4. Planning Lifecycle Contract
 1. Companion registers required task network(s) and utility scorer(s).
   - **Recommended path (Behavior-driven)**: Use task network builder ACEs on behavior addon (Initialize → Add → Load) to compose networks declaratively, export as JSON from world-state keys, then register with manager.
-  - **Manager-direct path (Manager Builder)**: Use manager's native builder ACEs (BeginTaskNetwork → Add* → RegisterTaskNetwork) to define networks directly on manager.
+  - **Manager-direct path (Manager Builder)**: Use manager's native builder ACEs (BeginTaskNetwork/BeginUtilityScorer → Add* → RegisterBuiltTaskNetwork/RegisterBuiltUtilityScorer) to define content directly on manager.
   - **Legacy-compatible path**: JSON registration via `Setup: Register ...` actions (both behavior and manager support this).
 2. Companion provides world-state inputs continuously.
 3. Companion requests or invalidates plans based on gameplay events.
@@ -132,11 +132,11 @@ The script API comes from ACE-exposed methods. Both behavior addon and manager p
 - AddMethodCondition(agentType, taskName, methodId, key, op, value)
 - AddMethodSubtask(agentType, taskName, methodId, subtaskTaskName)
 - SetMethodUtilityScorer(agentType, taskName, methodId, scorerId)
-- RegisterTaskNetwork(agentType)
+- RegisterBuiltTaskNetwork(agentType)
 - BeginUtilityScorer(scorerId, aggregation)
 - ClearUtilityScorer(scorerId)
 - AddUtilityInputLinear(scorerId, worldStateKey, weight, invert, x1, y1, x2, y2)
-- RegisterUtilityScorer(scorerId)
+- RegisterBuiltUtilityScorer(scorerId)
 
 Legacy JSON setup examples (still supported by both addons):
 - RegisterTaskNetwork(agentType, networkJson)
@@ -244,7 +244,7 @@ const manager = runtime.objects.Manager.getFirstInstance();
 // Setup utilities and networks directly on manager
 manager.BeginUtilityScorer("guard_combat", "weighted_sum");
 manager.AddUtilityInputLinear("guard_combat", "targetVisible", 1, "0", 0, 0, 1, 1);
-manager.RegisterUtilityScorer("guard_combat");
+manager.RegisterBuiltUtilityScorer("guard_combat");
 
 manager.BeginTaskNetwork("guard", "guard_root");
 manager.AddCompoundTask("guard", "guard_root");
@@ -253,7 +253,7 @@ manager.AddMethod("guard", "guard_root", "m_chase");
 manager.AddMethodCondition("guard", "guard_root", "m_chase", "targetVisible", "eq", 1);
 manager.SetMethodUtilityScorer("guard", "guard_root", "m_chase", "guard_combat");
 manager.AddMethodSubtask("guard", "guard_root", "m_chase", "chase_target");
-manager.RegisterTaskNetwork("guard");
+manager.RegisterBuiltTaskNetwork("guard");
 ```
 
 ### Pattern C: Runtime Management (Both patterns support this)
@@ -296,7 +296,7 @@ manager.RegisterUtilityScorer(guardCombatScorerJson);
 - Do not depend on manager internal underscore methods.
 - Prefer ACE-exposed methods only.
 
-## 15. Content Libraries and Export Workflow
+## 14. Content Libraries and Export Workflow
 
 Behavior addon builders enable creation of reusable, version-controlled content libraries:
 
@@ -326,9 +326,9 @@ assets/ai_content/
     └── extraction_360_coverage.json
 ```
 
-See Guide.md Section 9C for comprehensive content creation examples.
+See Guide.md sections 10 and 24 for comprehensive content creation examples.
 
-## 16. Companion Checklist
+## 15. Companion Checklist
 - Register scorers before any task-network method references those scorer IDs.
 - Register networks/scorers before requesting plans.
 - **Recommended**: Use behavior addon builders for content composition in team projects.

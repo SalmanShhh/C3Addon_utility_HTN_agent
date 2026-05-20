@@ -1,9 +1,9 @@
 <img src="./src/icon.svg" width="100" /><br>
 # Utility-Driven HTN (Hierarchical Task Network) Agent
 <i>Give any object smart AI, attach this behavior and it automatically registers with the HTN Manager, runs utility-scored planning, tracks alert tiers, reacts to sight/sound/damage signals, and fires clean event-sheet triggers for each task. No AI boilerplate, no per-instance glue code. Supports squads, slot-based tactical coordination, temporary task overrides, save/load, and performance scaling for any game size.</i> <br>
-### Version 1.0.0.1
+### Version 1.1.1.0
 
-[<img src="https://placehold.co/200x50/4493f8/FFF?text=Download&font=montserrat" width="200"/>](https://github.com/SalmanShhh/C3Addon_utility_driven_htn_hierarchical_task_network_agent/releases/download/salmanshh_DHTN_Agent-1.0.0.1.c3addon/salmanshh_DHTN_Agent-1.0.0.1.c3addon)
+[<img src="https://placehold.co/200x50/4493f8/FFF?text=Download&font=montserrat" width="200"/>](https://github.com/SalmanShhh/C3Addon_utility_driven_htn_hierarchical_task_network_agent/releases/download/salmanshh_DHTN_Agent-1.1.1.0.c3addon/salmanshh_DHTN_Agent-1.1.1.0.c3addon)
 <br>
 <sub> [See all releases](https://github.com/SalmanShhh/C3Addon_utility_driven_htn_hierarchical_task_network_agent/releases) </sub> <br>
 
@@ -55,12 +55,15 @@ npm run dev
 ## Actions
 | Action | Description | Params
 | --- | --- | --- |
+| Coordination: Add Slot To Builder | Adds one slot to the current builder. Call Initialize Slot Builder first. | Squad ID             *(string)* <br>Slot Type             *(string)* <br>Slot ID             *(string)* <br>X             *(number)* <br>Y             *(number)* <br> |
 | Coordination: Assign Agent To Squad | Adds an agent to a squad and syncs squad world-state keys. | Agent UID             *(number)* <br>Squad ID             *(string)* <br> |
 | Coordination: Auto Assign Nearest Free Slot | Finds nearest free slot and reserves it for the agent. | Agent UID             *(number)* <br>Squad ID             *(string)* <br>Slot Type             *(string)* <br>Agent X             *(number)* <br>Agent Y             *(number)* <br>Max Distance             *(number)* <br>TTL (sec)             *(number)* <br> |
 | Coordination: Clear Squad State Key | Clears one shared squad state key. | Squad ID             *(string)* <br>Key             *(string)* <br> |
+| Coordination: Initialize Slot Builder | Starts a new slot collection. Use with Add Slot To Builder then commit with Load Slot Set. | Squad ID             *(string)* <br>Slot Type             *(string)* <br> |
 | Coordination: Invalidate Squad Plans | Marks squad plans stale so they are replanned on coordination pass. | Squad ID             *(string)* <br> |
 | Coordination: Load Slot Positions From JSON | Imports slot coordinates from a JSON array string. | Squad ID             *(string)* <br>Slot Type             *(string)* <br>Slots JSON             *(string)* <br> |
 | Coordination: Load Slot Positions From World State Key | Loads JSON slot positions from a world-state key and imports them. | Squad ID             *(string)* <br>Slot Type             *(string)* <br>Scope             *(combo)* <br>Key             *(string)* <br>Agent UID             *(number)* <br> |
+| Coordination: Load Slot Set From Builder | Commits all slots added via Add Slot To Builder to coordination. | Squad ID             *(string)* <br>Slot Type             *(string)* <br> |
 | Coordination: Release Slot | Releases a slot reservation if present. | Squad ID             *(string)* <br>Slot Type             *(string)* <br>Slot ID             *(string)* <br> |
 | Coordination: Remove Agent From Squad | Removes an agent from its current squad and releases owned slots. | Agent UID             *(number)* <br> |
 | Coordination: Request Squad Plans | Requests immediate plan updates for all squad members. | Squad ID             *(string)* <br> |
@@ -76,6 +79,9 @@ npm run dev
 | Coordination: Set Squad Leader | Sets one leader UID for the squad. | Squad ID             *(string)* <br>Agent UID             *(number)* <br> |
 | Coordination: Set Squad State Key | Writes one shared squad state key and mirrors it to squad members. | Squad ID             *(string)* <br>Key             *(string)* <br>Value             *(any)* <br> |
 | Coordination: Squad Plan Control | Combined squad plan control for invalidate, request, or both. | Mode             *(combo)* <br>Squad ID             *(string)* <br> |
+| Setup: Add Task to Network Builder | Adds one task to the network being built. Specify task ID, description, and type for manager reference. | Task ID             *(string)* <br>Network ID             *(string)* <br>Description             *(string)* <br>Task Type             *(combo)* <br> |
+| Setup: Initialize Task Network Builder | Starts a new task network definition. Use with Add Task to Builder then commit with Load Task Network. | Network ID             *(string)* <br> |
+| Setup: Load Task Network from Builder | Commits all accumulated tasks to a JSON representation and stores in world state for export or manager registration. | Network ID             *(string)* <br>Export Key             *(string)* <br> |
 | Setup: Set Agent Type | Switches this object to another AI profile and replans. Use case: turn a civilian into a guard during an alarm. | Agent Type             *(string)* <br> |
 | Setup: Set Enabled | Turns this agent processing on or off. Use case: disable distant enemies to save CPU. | Enabled             *(boolean)* <br> |
 | Setup: Set Planning Interval | Sets periodic planning time in seconds. Use case: increase to 2 seconds for background NPCs to reduce CPU. | Seconds             *(number)* <br> |
@@ -173,6 +179,10 @@ npm run dev
 
 ---
 ## Changelog
+
+**1.1.1.0**
+
+**1.1.0.0**
 
 **1.0.0.1**
 
