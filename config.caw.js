@@ -14,7 +14,8 @@ export const minConstructVersion = undefined;
 export const author = "SalmanShh";
 export const website = "https://www.construct.net";
 export const documentation = "https://www.construct.net";
-export const description = "-";
+export const description =
+  "Per-instance AI behavior that drives planning, signals, and task state for attached objects.";
 export const category = ADDON_CATEGORY.ATTRIBUTES;
 
 export const hasDomside = false;
@@ -38,7 +39,16 @@ export const files = {
 };
 
 // categories that are not filled will use the folder name
-export const aceCategories = {};
+export const aceCategories = {
+  Setup: "Setup",
+  World_State: "World State",
+  Signals: "Signals",
+  Task_Control: "Task Control",
+  Coordination: "Coordination",
+  Events: "Events",
+  State_Checks: "State Checks",
+  Query: "Query",
+};
 
 export const info = {
   // icon: "icon.svg",
@@ -79,45 +89,96 @@ export const info = {
 };
 
 export const properties = [
-  /*
   {
-    type: PROPERTY_TYPE.INTEGER,
-    id: "property_id",
+    type: PROPERTY_TYPE.TEXT,
+    id: "agentType",
+    options: {
+      initialValue: "default",
+    },
+    name: "Agent Type",
+    desc: "Selects which AI network this object uses. Use case: assign \"grunt\" to basic enemies and \"boss\" to bosses.",
+  },
+  {
+    type: PROPERTY_TYPE.COMBO,
+    id: "planningMode",
+    options: {
+      initialValue: "hybrid",
+      items: [
+        { reactive: "Reactive" },
+        { deliberate: "Deliberate" },
+        { hybrid: "Hybrid" },
+      ],
+    },
+    name: "Planning Mode",
+    desc: "Sets when planning runs. Use case: choose deliberate for many background NPCs to reduce CPU usage.",
+  },
+  {
+    type: PROPERTY_TYPE.FLOAT,
+    id: "planningIntervalSec",
+    options: {
+      initialValue: 1,
+      minValue: 0,
+    },
+    name: "Planning Interval (sec)",
+    desc: "Time in seconds between periodic replans. Use case: set 0.5 for responsive guards, 2.0 for idle crowds.",
+  },
+  {
+    type: PROPERTY_TYPE.FLOAT,
+    id: "urgencyThreshold",
+    options: {
+      initialValue: 0.55,
+      minValue: 0,
+      maxValue: 1,
+    },
+    name: "Urgency Threshold",
+    desc: "Urgency needed to replan instantly in hybrid mode. Use case: keep low for stealth games that need quick reactions.",
+  },
+  {
+    type: PROPERTY_TYPE.FLOAT,
+    id: "initialAlertLevel",
     options: {
       initialValue: 0,
-      interpolatable: false,
-
-      // minValue: 0, // omit to disable
-      // maxValue: 100, // omit to disable
-
-      // for type combo only
-      // items: [
-      //   {itemId1: "item name1" },
-      //   {itemId2: "item name2" },
-      // ],
-
-      // dragSpeedMultiplier: 1, // omit to disable
-
-      // for type object only
-      // allowedPluginIds: ["Sprite", "<world>"],
-
-      // for type link only
-      // linkCallback: function(instOrObj) {},
-      // linkText: "Link Text",
-      // callbackType:
-      //   "for-each-instance"
-      //   "once-for-type"
-
-      // for type info only
-      // infoCallback: function(inst) {},
-
-      // for type projectfile only (plugins only, Addon SDK v2, r426+)
-      // A dropdown list from which any project file in the project can be chosen.
-      // The property value at runtime is a relative path to fetch the project file from.
-      // filter: ".txt", // optional: filter list by file extension (e.g., ".txt" to only list .txt files)
+      minValue: 0,
+      maxValue: 1,
     },
-    name: "Property Name",
-    desc: "Property Description",
-  }
-  */
+    name: "Initial Alert Level",
+    desc: "Starting alert value from 0 to 1. Use case: begin ambush enemies at 0.6 so they start suspicious.",
+  },
+  {
+    type: PROPERTY_TYPE.FLOAT,
+    id: "taskTimeoutSec",
+    options: {
+      initialValue: 0,
+      minValue: 0,
+    },
+    name: "Task Timeout (sec)",
+    desc: "Auto-fails a stuck task after this many seconds. Use case: set 8 to recover if pathing gets blocked.",
+  },
+  {
+    type: PROPERTY_TYPE.CHECK,
+    id: "autoRegister",
+    options: {
+      initialValue: true,
+    },
+    name: "Auto Register",
+    desc: "Registers with the manager on spawn. Use case: disable for cutscene actors you register later by events.",
+  },
+  {
+    type: PROPERTY_TYPE.CHECK,
+    id: "enabled",
+    options: {
+      initialValue: true,
+    },
+    name: "Enabled",
+    desc: "Turns this behavior processing on or off. Use case: disable far-away enemies to save performance.",
+  },
+  {
+    type: PROPERTY_TYPE.TEXT,
+    id: "debugLabel",
+    options: {
+      initialValue: "",
+    },
+    name: "Debug Label",
+    desc: "Optional name shown in warnings. Use case: set \"Guard_North\" to quickly identify problem agents.",
+  },
 ];
