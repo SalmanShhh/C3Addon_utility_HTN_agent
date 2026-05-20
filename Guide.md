@@ -14,15 +14,17 @@ Utility-Driven HTN Agent is a per-instance Construct 3 behavior that connects ea
 8. [Temporary Tasks and Manual Control](#8-temporary-tasks-and-manual-control)
 9. [Performance and Scaling](#9-performance-and-scaling)
 10. [9A. Squad Coordination, Roles, and Slot Tactics](#9a-squad-coordination-roles-and-slot-tactics)
-10. [Actions Reference](#10-actions-reference)
-11. [Conditions Reference](#11-conditions-reference)
-12. [Expressions Reference](#12-expressions-reference)
-13. [Triggers Reference](#13-triggers-reference)
-14. [System Use Cases](#14-system-use-cases)
-15. [Game Use Cases](#15-game-use-cases)
-16. [Scripting (C3 Script / JavaScript)](#16-scripting-c3-script--javascript)
-17. [Using This Addon With the Manager Companion](#17-using-this-addon-with-the-manager-companion)
-18. [Tips and Common Mistakes](#18-tips-and-common-mistakes)
+11. [9B. Programmatic Slot Builders (No Raw JSON)](#9b-programmatic-slot-builders-no-raw-json)
+12. [9C. Content Creation, Export, and Reusable Libraries](#9c-content-creation-export-and-reusable-libraries)
+13. [Actions Reference](#10-actions-reference)
+14. [Conditions Reference](#11-conditions-reference)
+15. [Expressions Reference](#12-expressions-reference)
+16. [Triggers Reference](#13-triggers-reference)
+17. [System Use Cases](#14-system-use-cases)
+18. [Game Use Cases](#15-game-use-cases)
+19. [Scripting (C3 Script / JavaScript)](#16-scripting-c3-script--javascript)
+20. [Using This Addon With the Manager Companion](#17-using-this-addon-with-the-manager-companion)
+21. [Tips and Common Mistakes](#18-tips-and-common-mistakes)
 
 ## 1. Scenarios Where This Addon Excels
 
@@ -574,6 +576,613 @@ Tip: Pair dynamic throttling with slightly larger planning intervals for low-pri
 18. **Monster hunter packs:** Pack leader writes prey direction while flankers auto-assign nearest intercept slots.
 19. **Cyberpunk gang turf fights:** Street squads claim alley choke slots and replan as soon as rival presence keys change.
 20. **Fantasy raid mobs:** Mob squads reserve healer-guard and frontline slots so support units keep protected spacing.
+
+## 9B. Programmatic Slot Builders (No Raw JSON)
+
+Historically, loading slot maps required writing raw JSON strings in your event sheet, error-prone and beginner-hostile. The slot builder pattern eliminates that pain by letting you compose slot maps action-by-action using clean event-sheet sequences.
+
+### Why Slot Builders Matter
+
+**Before (raw JSON):**
+```javascript
+// Event sheet or script must construct:
+{
+  "sniper_nest": { "x": 100, "y": 200 },
+  "flank_left": { "x": -150, "y": 50 },
+  "flank_right": { "x": 150, "y": 50 }
+}
+```
+Problems:
+- Easy to introduce syntax errors (missing commas, quotes, etc.)
+- Hard to debug: JSON validation failures show up only at runtime
+- Requires string concatenation or external JSON editors
+- Not compatible with non-programming players in co-authored projects
+
+**After (slot builder ACEs):**
+```
+Initialize Slot Builder: squadId="squad_alpha", slotType="sniper_positions"
+Add Slot to Builder: squadId="squad_alpha", slotType="sniper_positions", slotId="nest", x=100, y=200
+Add Slot to Builder: squadId="squad_alpha", slotType="sniper_positions", slotId="flank_left", x=-150, y=50
+Add Slot to Builder: squadId="squad_alpha", slotType="sniper_positions", slotId="flank_right", x=150, y=50
+Load Slot Set from Builder: squadId="squad_alpha", slotType="sniper_positions"
+```
+Benefits:
+- No JSON syntax to get wrong
+- Each slot is one action with clear parameters
+- Easy for designers and programmers to read
+- Slots can be added conditionally or dynamically
+
+### Slot Builder API
+
+**Initialize Slot Builder** *(Start collecting slots)*
+- **squadId**: String identifier for the squad (e.g., "squad_alpha")
+- **slotType**: String label for this slot collection (e.g., "sniper_positions", "formation_bounds")
+- **Effect**: Clears any previous builder state for this squadId+slotType pair and prepares to collect slots.
+
+**Add Slot to Builder** *(Add one slot to the current collection)*
+- **squadId**: Must match the Initialize call
+- **slotType**: Must match the Initialize call
+- **slotId**: Unique name for this slot (e.g., "nest", "left_flank", "boss_tank_position")
+- **x, y**: World position for this slot
+- **Effect**: Appends this slot to the builder. If squadId or slotType don't match, the action is ignored.
+
+**Load Slot Set from Builder** *(Commit all collected slots to coordination)*
+- **squadId**: Must match the Initialize call
+- **slotType**: Must match the Initialize call
+- **Effect**: Converts all accumulated slots into the coordination system. Agents can now reserve and occupy these slots. Builder is cleared.
+
+### Complete Event-Sheet Example
+
+**Scenario**: Form a defensive line with sniper nests, flanking positions, and reserve spots.
+
+```
+On Start of Layout:
+  ├─ Agent "guard_1": Initialize Slot Builder with squadId="defense_line", slotType="positions"
+  ├─ Agent "guard_1": Add Slot to Builder: squadId="defense_line", slotType="positions", slotId="north_nest", x=0, y=-200
+  ├─ Agent "guard_1": Add Slot to Builder: squadId="defense_line", slotType="positions", slotId="south_nest", x=0, y=200
+  ├─ Agent "guard_1": Add Slot to Builder: squadId="defense_line", slotType="positions", slotId="flank_east", x=300, y=0
+  ├─ Agent "guard_1": Add Slot to Builder: squadId="defense_line", slotType="positions", slotId="flank_west", x=-300, y=0
+  ├─ Agent "guard_1": Add Slot to Builder: squadId="defense_line", slotType="positions", slotId="reserve_a", x=100, y=100
+  ├─ Agent "guard_1": Add Slot to Builder: squadId="defense_line", slotType="positions", slotId="reserve_b", x=-100, y=-100
+  └─ Agent "guard_1": Load Slot Set from Builder: squadId="defense_line", slotType="positions"
+
+  // Now agents can reserve and occupy these slots:
+  ├─ Guard "guard_1": Assign Agent to Squad with squadId="defense_line"
+  ├─ Guard "guard_2": Assign Agent to Squad with squadId="defense_line"
+  ├─ Guard "guard_1": Auto-assign Nearest Free Slot: squadId="defense_line", slotType="positions"
+  └─ Guard "guard_2": Auto-assign Nearest Free Slot: squadId="defense_line", slotType="positions"
+```
+
+### Conditional Slot Building
+
+Slots can be added conditionally based on game state:
+
+```
+On Enemy Alert Detected:
+  ├─ Enemy "commander": Initialize Slot Builder with squadId="response_squad", slotType="intercept_points"
+  ├─ For each Patrol Point in Player Region:
+  │  └─ Enemy: Add Slot to Builder: squadId="response_squad", slotType="intercept_points", slotId=LoopIndex, x=PointX, y=PointY
+  └─ Enemy "commander": Load Slot Set from Builder: squadId="response_squad", slotType="intercept_points"
+
+  // Squad agents can now intercept at dynamic locations
+```
+
+### Multiple Slot Types per Squad
+
+A single squad can have multiple slot types (e.g., "firing_positions" and "cover_spots"):
+
+```
+On Initialize Squad:
+  // First slot type: firing positions
+  ├─ Soldier "lead": Initialize Slot Builder: squadId="assault_squad", slotType="firing_positions"
+  ├─ Soldier "lead": Add Slot to Builder: squadId="assault_squad", slotType="firing_positions", slotId="window_1", x=50, y=0
+  ├─ Soldier "lead": Add Slot to Builder: squadId="assault_squad", slotType="firing_positions", slotId="window_2", x=-50, y=0
+  └─ Soldier "lead": Load Slot Set from Builder: squadId="assault_squad", slotType="firing_positions"
+
+  // Second slot type: cover spots
+  ├─ Soldier "lead": Initialize Slot Builder: squadId="assault_squad", slotType="cover_spots"
+  ├─ Soldier "lead": Add Slot to Builder: squadId="assault_squad", slotType="cover_spots", slotId="pillar_left", x=-100, y=50
+  ├─ Soldier "lead": Add Slot to Builder: squadId="assault_squad", slotType="cover_spots", slotId="pillar_right", x=100, y=50
+  └─ Soldier "lead": Load Slot Set from Builder: squadId="assault_squad", slotType="cover_spots"
+
+  // Agents can now assign to either slot type
+  ├─ Soldier "marksman": Auto-assign Nearest Free Slot: squadId="assault_squad", slotType="firing_positions"
+  └─ Soldier "shield_bearer": Auto-assign Nearest Free Slot: squadId="assault_squad", slotType="cover_spots"
+```
+
+### Programmatic Generation (Script Example)
+
+If you're generating slots from procedural layouts or data structures, you can use script with the builder pattern:
+
+```javascript
+// Construct 3 Script
+const squadId = "generated_squad";
+const slotType = "waypoints";
+const positions = [
+  { id: "wp_1", x: 100, y: 100 },
+  { id: "wp_2", x: 200, y: 150 },
+  { id: "wp_3", x: 300, y: 100 },
+];
+
+inst.salmanshh_DHTN_Agent._initializeSlotBuilder(squadId, slotType);
+for (const pos of positions) {
+  inst.salmanshh_DHTN_Agent._addSlotToBuilder(squadId, slotType, pos.id, pos.x, pos.y);
+}
+inst.salmanshh_DHTN_Agent._loadSlotSetFromBuilder(squadId, slotType);
+
+// Squad agents can now be assigned to waypoints
+```
+
+### Migration from Raw JSON
+
+If you currently use `Load Slot Positions from JSON`, you can migrate to builders incrementally:
+
+**Old approach:**
+```
+Agent: Load Slot Positions from JSON
+  JSON: {"nest":{"x":0,"y":-200},"flank_left":{"x":-300,"y":0},"flank_right":{"x":300,"y":0}}
+  squadId: "defense_squad"
+  slotType: "positions"
+```
+
+**New approach:**
+```
+Agent: Initialize Slot Builder: squadId="defense_squad", slotType="positions"
+Agent: Add Slot to Builder: squadId="defense_squad", slotType="positions", slotId="nest", x=0, y=-200
+Agent: Add Slot to Builder: squadId="defense_squad", slotType="positions", slotId="flank_left", x=-300, y=0
+Agent: Add Slot to Builder: squadId="defense_squad", slotType="positions", slotId="flank_right", x=300, y=0
+Agent: Load Slot Set from Builder: squadId="defense_squad", slotType="positions"
+```
+
+The builder approach is more verbose, but far easier to read, debug, and maintain — especially for teams with non-programmers.
+
+## 9C. Content Creation, Export, and Reusable Libraries
+
+The addon provides two parallel builder patterns for composing game content that can be exported as JSON and reused across projects, levels, and teams. Instead of manually crafting JSON files or copy-pasting event sheet code, designers and programmers can use ACE-driven builders to compose content procedurally, then save it for later import.
+
+### Why Content Builders Matter
+
+**Traditional workflow (painful):**
+- Designer creates formation slots manually in JSON editor
+- JSON is fragile to syntax errors
+- Sharing formation data between projects requires manual copy-paste
+- Changes to slot data require JSON re-editing or script updates
+- Non-programmers cannot easily adjust spatial data
+
+**Builder workflow (simple):**
+- Designer uses three ACEs to compose slot or task data action-by-action
+- Data is exported to clean JSON via world-state keys
+- JSON can be copied into a project data file or library
+- Anyone can modify builder ACEs visually
+- Content can be version-controlled and shared
+
+### Two Builder Patterns
+
+#### Pattern 1: Slot Builder (Tactical Positions)
+Compose squad slot maps for formations, cover, rally points, and spatial assignments.
+
+**Use for:** formations, flanking positions, defensive lines, patrol routes, intercept points, breach lanes.
+
+#### Pattern 2: Task Network Builder (AI Behavior)
+Compose task network definitions describing primitive tasks and their descriptions.
+
+**Use for:** custom agent archetypes, role definitions, scenario-specific behaviors, difficulty variants.
+
+### Content Export Workflow
+
+1. **Compose Content** using builder ACEs in a layout event sheet
+2. **Export to JSON** using world-state keys to capture serialized data
+3. **Save JSON File** from browser console or external tool
+4. **Import into Projects** via manager registration or behavior setup
+5. **Version Control** JSON files alongside your Construct project
+
+### Slot Builder Export Examples
+
+#### 1. Defensive Formation
+
+**Scenario:** Three guards in a defensive V-shape.
+
+```
+On start of layout
+  ├─ Guard1.AI -> Initialize Slot Builder: squadId="defense", slotType="stance"
+  ├─ Guard1.AI -> Add Slot: squadId="defense", slotType="stance", slotId="point", x=0, y=0
+  ├─ Guard1.AI -> Add Slot: squadId="defense", slotType="stance", slotId="left_wing", x=-150, y=100
+  ├─ Guard1.AI -> Add Slot: squadId="defense", slotType="stance", slotId="right_wing", x=150, y=100
+  ├─ Guard1.AI -> Load Slot Set: squadId="defense", slotType="stance"
+  └─ Guard1.AI -> Export to World State -> "defensiveFormation"
+
+Saved JSON:
+{
+  "stance": {
+    "point": { "x": 0, "y": 0 },
+    "left_wing": { "x": -150, "y": 100 },
+    "right_wing": { "x": 150, "y": 100 }
+  }
+}
+```
+
+#### 2. Flanking Positions
+
+**Scenario:** Approach from three angles simultaneously.
+
+```
+On start of layout
+  ├─ Leader.AI -> Initialize Slot Builder: squadId="assault", slotType="flank"
+  ├─ Leader.AI -> Add Slot: squadId="assault", slotType="flank", slotId="north", x=0, y=-250
+  ├─ Leader.AI -> Add Slot: squadId="assault", slotType="flank", slotId="east", x=250, y=0
+  ├─ Leader.AI -> Add Slot: squadId="assault", slotType="flank", slotId="south", x=0, y=250
+  ├─ Leader.AI -> Load Slot Set: squadId="assault", slotType="flank"
+  └─ Leader.AI -> World State: Set World State -> "flankPositions", (export JSON)
+
+Exported Formation:
+{
+  "flank": {
+    "north": { "x": 0, "y": -250 },
+    "east": { "x": 250, "y": 0 },
+    "south": { "x": 0, "y": 250 }
+  }
+}
+```
+
+#### 3. Cover Points Cluster
+
+**Scenario:** Six defensive cover positions around a building.
+
+```
+On start of layout
+  ├─ Defender.AI -> Initialize Slot Builder: squadId="base_defense", slotType="cover"
+  ├─ Defender.AI -> Add Slot: squadId="base_defense", slotType="cover", slotId="wall_corner_ne", x=200, y=-180
+  ├─ Defender.AI -> Add Slot: squadId="base_defense", slotType="cover", slotId="wall_corner_se", x=200, y=180
+  ├─ Defender.AI -> Add Slot: squadId="base_defense", slotType="cover", slotId="wall_corner_nw", x=-200, y=-180
+  ├─ Defender.AI -> Add Slot: squadId="base_defense", slotType="cover", slotId="wall_corner_sw", x=-200, y=180
+  ├─ Defender.AI -> Add Slot: squadId="base_defense", slotType="cover", slotId="door_left", x=-80, y=200
+  ├─ Defender.AI -> Add Slot: squadId="base_defense", slotType="cover", slotId="door_right", x=80, y=200
+  ├─ Defender.AI -> Load Slot Set: squadId="base_defense", slotType="cover"
+  └─ Defender.AI -> Export to File: "base_defense_cover.json"
+```
+
+#### 4. Patrol Waypoints
+
+**Scenario:** Guard patrol route with 5 waypoints.
+
+```
+On start of layout
+  ├─ Guard.AI -> Initialize Slot Builder: squadId="patrol_alpha", slotType="waypoints"
+  ├─ Guard.AI -> Add Slot: squadId="patrol_alpha", slotType="waypoints", slotId="wp_1", x=100, y=100
+  ├─ Guard.AI -> Add Slot: squadId="patrol_alpha", slotType="waypoints", slotId="wp_2", x=400, y=100
+  ├─ Guard.AI -> Add Slot: squadId="patrol_alpha", slotType="waypoints", slotId="wp_3", x=400, y=400
+  ├─ Guard.AI -> Add Slot: squadId="patrol_alpha", slotType="waypoints", slotId="wp_4", x=100, y=400
+  ├─ Guard.AI -> Add Slot: squadId="patrol_alpha", slotType="waypoints", slotId="wp_5", x=250, y=250
+  ├─ Guard.AI -> Load Slot Set: squadId="patrol_alpha", slotType="waypoints"
+  └─ Guard.AI -> Save to Library: "patrol_routes.json"
+```
+
+#### 5. Ambush Ring Positions
+
+**Scenario:** Eight positions around player for encirclement.
+
+```
+On start of layout
+  ├─ Enemy.AI -> Initialize Slot Builder: squadId="ambush", slotType="surround"
+  // Cardinal directions
+  ├─ Enemy.AI -> Add Slot: squadId="ambush", slotType="surround", slotId="N", x=0, y=-300
+  ├─ Enemy.AI -> Add Slot: squadId="ambush", slotType="surround", slotId="E", x=300, y=0
+  ├─ Enemy.AI -> Add Slot: squadId="ambush", slotType="surround", slotId="S", x=0, y=300
+  ├─ Enemy.AI -> Add Slot: squadId="ambush", slotType="surround", slotId="W", x=-300, y=0
+  // Diagonal directions
+  ├─ Enemy.AI -> Add Slot: squadId="ambush", slotType="surround", slotId="NE", x=210, y=-210
+  ├─ Enemy.AI -> Add Slot: squadId="ambush", slotType="surround", slotId="SE", x=210, y=210
+  ├─ Enemy.AI -> Add Slot: squadId="ambush", slotType="surround", slotId="SW", x=-210, y=210
+  ├─ Enemy.AI -> Add Slot: squadId="ambush", slotType="surround", slotId="NW", x=-210, y=-210
+  ├─ Enemy.AI -> Load Slot Set: squadId="ambush", slotType="surround"
+  └─ Export: "ambush_8_ring.json"
+```
+
+#### 6. Horde Entry Points
+
+**Scenario:** Five spawn locations for waves to flood through.
+
+```
+On start of layout
+  ├─ Horde.AI -> Initialize Slot Builder: squadId="invasion", slotType="entry"
+  ├─ Horde.AI -> Add Slot: squadId="invasion", slotType="entry", slotId="gate_main", x=640, y=320
+  ├─ Horde.AI -> Add Slot: squadId="invasion", slotType="entry", slotId="breach_left", x=200, y=360
+  ├─ Horde.AI -> Add Slot: squadId="invasion", slotType="entry", slotId="breach_right", x=1080, y=360
+  ├─ Horde.AI -> Add Slot: squadId="invasion", slotType="entry", slotId="tunnel_under", x=640, y=600
+  ├─ Horde.AI -> Add Slot: squadId="invasion", slotType="entry", slotId="tower_roof", x=640, y=50
+  ├─ Horde.AI -> Load Slot Set: squadId="invasion", slotType="entry"
+  └─ Export: "invasion_entry_points.json"
+```
+
+#### 7. Siege Line Rotation
+
+**Scenario:** Three firing lines that agents rotate through.
+
+```
+On start of layout
+  ├─ Defender.AI -> Initialize Slot Builder: squadId="siege_defense", slotType="fire_line"
+  ├─ Defender.AI -> Add Slot: squadId="siege_defense", slotType="fire_line", slotId="primary_1", x=150, y=100
+  ├─ Defender.AI -> Add Slot: squadId="siege_defense", slotType="fire_line", slotId="primary_2", x=250, y=100
+  ├─ Defender.AI -> Add Slot: squadId="siege_defense", slotType="fire_line", slotId="primary_3", x=350, y=100
+  ├─ Defender.AI -> Add Slot: squadId="siege_defense", slotType="fire_line", slotId="reload_zone", x=400, y=350
+  ├─ Defender.AI -> Add Slot: squadId="siege_defense", slotType="fire_line", slotId="reserve", x=150, y=350
+  ├─ Defender.AI -> Load Slot Set: squadId="siege_defense", slotType="fire_line"
+  └─ Export: "siege_fire_rotation.json"
+```
+
+#### 8. Extraction Perimeter
+
+**Scenario:** Squad maintains 360-degree coverage around extraction point.
+
+```
+On start of layout
+  ├─ Extractor.AI -> Initialize Slot Builder: squadId="extraction", slotType="perimeter"
+  ├─ Extractor.AI -> Add Slot: squadId="extraction", slotType="perimeter", slotId="north_post", x=640, y=150
+  ├─ Extractor.AI -> Add Slot: squadId="extraction", slotType="perimeter", slotId="south_post", x=640, y=550
+  ├─ Extractor.AI -> Add Slot: squadId="extraction", slotType="perimeter", slotId="east_post", x=1050, y=350
+  ├─ Extractor.AI -> Add Slot: squadId="extraction", slotType="perimeter", slotId="west_post", x=230, y=350
+  ├─ Extractor.AI -> Add Slot: squadId="extraction", slotType="perimeter", slotId="overwatch", x=640, y=50
+  ├─ Extractor.AI -> Load Slot Set: squadId="extraction", slotType="perimeter"
+  └─ Export: "extraction_360_coverage.json"
+```
+
+### Task Network Builder Export Examples
+
+This section provides 14 detailed builder use case examples total:
+- 8 detailed Slot Builder examples
+- 6 detailed Task Network Builder examples
+
+If you want a minimum set, use any 10 of these detailed examples as your starter content pack.
+
+#### 1. Basic Patrol Network
+
+**Scenario:** Simple network with idle, patrol, and investigate tasks.
+
+```
+On start of layout
+  ├─ Guard.AI -> Initialize Task Network Builder: networkId="guard_basic"
+  ├─ Guard.AI -> Add Task: taskId="idle", networkId="guard_basic", description="Stand and wait", taskType="primitive"
+  ├─ Guard.AI -> Add Task: taskId="patrol", networkId="guard_basic", description="Walk patrol route", taskType="primitive"
+  ├─ Guard.AI -> Add Task: taskId="investigate", networkId="guard_basic", description="Check area", taskType="primitive"
+  ├─ Guard.AI -> Load Task Network: networkId="guard_basic", exportKey="builtGuardNetwork"
+  └─ Export: "guard_network_basic.json"
+
+Exported JSON:
+{
+  "networkId": "guard_basic",
+  "tasks": [
+    { "id": "idle", "description": "Stand and wait", "type": "primitive" },
+    { "id": "patrol", "description": "Walk patrol route", "type": "primitive" },
+    { "id": "investigate", "description": "Check area", "type": "primitive" }
+  ],
+  "version": "1.0"
+}
+```
+
+#### 2. Combat Behavior Network
+
+**Scenario:** Network with multiple tactical options.
+
+```
+On start of layout
+  ├─ Enemy.AI -> Initialize Task Network Builder: networkId="enemy_combat"
+  ├─ Enemy.AI -> Add Task: taskId="search", description="Scan for threat", type="primitive"
+  ├─ Enemy.AI -> Add Task: taskId="pursue", description="Move toward target", type="primitive"
+  ├─ Enemy.AI -> Add Task: taskId="engage", description="Attack target", type="primitive"
+  ├─ Enemy.AI -> Add Task: taskId="suppress", description="Pin down target", type="primitive"
+  ├─ Enemy.AI -> Add Task: taskId="flank", description="Move to flank position", type="primitive"
+  ├─ Enemy.AI -> Add Task: taskId="retreat", description="Fall back to safety", type="primitive"
+  ├─ Enemy.AI -> Load Task Network: networkId="enemy_combat", exportKey="builtCombatNetwork"
+  └─ Export: "combat_behavior.json"
+```
+
+#### 3. Boss AI Network
+
+**Scenario:** Complex boss behavior with phase transitions.
+
+```
+On start of layout
+  ├─ Boss.AI -> Initialize Task Network Builder: networkId="boss_v1"
+  ├─ Boss.AI -> Add Task: taskId="idle_phase1", description="Boss entry animation", type="primitive"
+  ├─ Boss.AI -> Add Task: taskId="slash_attack", description="Perform melee slash", type="primitive"
+  ├─ Boss.AI -> Add Task: taskId="beam_attack", description="Fire beam attack", type="primitive"
+  ├─ Boss.AI -> Add Task: taskId="summon_adds", description="Call minions", type="primitive"
+  ├─ Boss.AI -> Add Task: taskId="phase_transition", description="Become invulnerable", type="composite"
+  ├─ Boss.AI -> Add Task: taskId="idle_phase2", description="Boss enraged state", type="primitive"
+  ├─ Boss.AI -> Add Task: taskId="enrage_attack", description="Enhanced attack", type="primitive"
+  ├─ Boss.AI -> Add Task: taskId="heal", description="Restore health", type="primitive"
+  ├─ Boss.AI -> Load Task Network: networkId="boss_v1", exportKey="builtBossNetwork"
+  └─ Export: "boss_difficulty_1.json"
+```
+
+#### 4. Civilian Behavior Network
+
+**Scenario:** Peaceful routine for non-combat NPCs.
+
+```
+On start of layout
+  ├─ Civilian.AI -> Initialize Task Network Builder: networkId="civilian_idle"
+  ├─ Civilian.AI -> Add Task: taskId="wander", description="Walk aimlessly", type="primitive"
+  ├─ Civilian.AI -> Add Task: taskId="rest", description="Stand or sit", type="primitive"
+  ├─ Civilian.AI -> Add Task: taskId="interact", description="Use object", type="primitive"
+  ├─ Civilian.AI -> Add Task: taskId="react_sound", description="Look at noise", type="primitive"
+  ├─ Civilian.AI -> Add Task: taskId="flee", description="Run from danger", type="primitive"
+  ├─ Civilian.AI -> Load Task Network: networkId="civilian_idle", exportKey="builtCivilianNetwork"
+  └─ Export: "civilian_network.json"
+```
+
+#### 5. Drone Swarm Network
+
+**Scenario:** Coordinated automated behavior for AI drones.
+
+```
+On start of layout
+  ├─ Drone.AI -> Initialize Task Network Builder: networkId="swarm_defense"
+  ├─ Drone.AI -> Add Task: taskId="orbit", description="Circle defensive point", type="primitive"
+  ├─ Drone.AI -> Add Task: taskId="converge", description="Fly toward threat", type="primitive"
+  ├─ Drone.AI -> Add Task: taskId="intercept", description="Block intruder path", type="primitive"
+  ├─ Drone.AI -> Add Task: taskId="stun", description="Emit stun field", type="primitive"
+  ├─ Drone.AI -> Add Task: taskId="charge_weapon", description="Prepare attack", type="primitive"
+  ├─ Drone.AI -> Add Task: taskId="fire_sync", description="Fire with swarm", type="composite"
+  ├─ Drone.AI -> Load Task Network: networkId="swarm_defense", exportKey="builtDroneNetwork"
+  └─ Export: "drone_swarm_tactics.json"
+```
+
+#### 6. Wildlife AI Network
+
+**Scenario:** Natural predator-prey behaviors.
+
+```
+On start of layout
+  ├─ Animal.AI -> Initialize Task Network Builder: networkId="wolf_pack"
+  ├─ Animal.AI -> Add Task: taskId="hunt", description="Track prey", type="primitive"
+  ├─ Animal.AI -> Add Task: taskId="stalk", description="Approach quietly", type="primitive"
+  ├─ Animal.AI -> Add Task: taskId="pounce", description="Execute attack", type="primitive"
+  ├─ Animal.AI -> Add Task: taskId="pack_coordinate", description="Wait for pack signal", type="composite"
+  ├─ Animal.AI -> Add Task: taskId="rest", description="Sleep and recover", type="primitive"
+  ├─ Animal.AI -> Add Task: taskId="flee_fire", description="Run from danger", type="primitive"
+  ├─ Animal.AI -> Load Task Network: networkId="wolf_pack", exportKey="builtWolfNetwork"
+  └─ Export: "wildlife_pack_behavior.json"
+```
+
+### 20+ Other Use Case Examples (Grouped by Theme)
+
+These 24 quick ideas are grouped so teams can pick by genre or feature focus.
+
+#### Stealth, Tactical, and Combat Scenarios
+
+- Stealth guard cone ring where inner slots are for melee and outer slots are for ranged units.
+- Sniper relocation lattice with fallback slots per alert tier.
+- Mech squad breaching lanes that alternate left-right to reduce path congestion.
+- Space station corridor control with crossfire lane slots and door breach tasks.
+- Castle wall defense positions with ladder intercept slots and archer rotation slots.
+- Factory infiltration patrols where route libraries swap by alarm level key.
+
+#### Squad Formations and Mission Routing
+
+- Multi-floor raid formation with slotType values split by floor labels like floor_1, floor_2.
+- Convoy escort route with rotating waypoint ownership to prevent follower overlap.
+- Rescue mission perimeter where one slotType secures civilians and another secures exits.
+- VIP extraction network with tasks for secure, escort, suppress, and fallback.
+- City riot control cordon slots with staged push and hold phases.
+- Co-op extraction enemies with separate slot maps for day and night variants.
+
+#### AI Archetypes and Behavior Networks
+
+- Boss arena hazard avoidance network with tasks for dodge, reposition, and punish windows.
+- Dynamic weather response network where storm intensity toggles between scout and shelter tasks.
+- Healer-support triangle formation for RPG companions around a tank character.
+- Drone recon sweep routes using waypoint slotType plus a recharge slotType.
+- Park civilian panic network with tasks for flee, hide, regroup, and return.
+- Tournament AI archetypes with one network per style: rushdown, zoner, grappler, bait.
+
+#### Horde, Wildlife, and Wave Systems
+
+- Zombie funnel defense slots around chokepoints with short TTL so gaps refill quickly.
+- Naval deck boarding slots for ladder tops, cannon lines, and hold positions.
+- Jungle predator ambush map with hidden pounce slots near foliage anchors.
+- Arena survival waves where each wave loads a different entry slot set from library JSON.
+- Monster den defense where creatures reserve den mouth slots before chase tasks.
+- Wildlife migration routes where seasonal JSON files redefine waypoint libraries.
+
+### Organizing Content Libraries
+
+#### Library Structure
+
+```
+ProjectRoot/
+├── assets/
+│   └── ai_content/
+│       ├── formations/
+│       │   ├── defensive_v.json
+│       │   ├── flanking_triangle.json
+│       │   └── ambush_8ring.json
+│       ├── routes/
+│       │   ├── patrol_square.json
+│       │   ├── patrol_compound.json
+│       │   └── invasion_entry_points.json
+│       ├── networks/
+│       │   ├── guard_basic.json
+│       │   ├── enemy_combat.json
+│       │   ├── boss_difficulty_1.json
+│       │   └── civilian_idle.json
+│       └── tactics/
+│           ├── siege_fire_rotation.json
+│           ├── extraction_360.json
+│           └── drone_swarm.json
+```
+
+#### Library Registration (Manager Setup)
+
+```
+On start of layout
+  // Load all predefined task networks
+  ├─ Manager -> Load task networks from library: "guard_basic", "enemy_combat", "boss_difficulty_1"
+  
+  // Agents can now use these networks immediately
+  ├─ Guard.AI -> Setup: Set Agent Type -> "guard_basic"
+  ├─ Enemy.AI -> Setup: Set Agent Type -> "enemy_combat"
+  └─ Boss.AI -> Setup: Set Agent Type -> "boss_difficulty_1"
+```
+
+### Exporting Content to Files
+
+#### Method 1: Browser Console (During Playtest)
+
+```javascript
+// In browser console while project is running
+const guardAgent = runtime.objects.Guard.getFirstInstance();
+const ai = guardAgent.behaviors.UtilityDrivenHTNAgent;
+
+// Get exported JSON from world state
+const networkJSON = ai.WorldState("builtGuardNetwork");
+console.log(networkJSON);
+
+// Copy and save to file
+navigator.clipboard.writeText(networkJSON)
+  .then(() => console.log("JSON copied to clipboard"))
+  .catch(e => console.error("Copy failed:", e));
+```
+
+#### Method 2: Save via Custom Plugin
+
+Create a simple Construct 3 plugin or use existing export functionality to save world-state keys as JSON files.
+
+#### Method 3: Manual Copy
+
+1. Export builder content to world-state key
+2. Read value from behaviors panel during debug
+3. Copy text to .json file in project assets
+4. Commit to version control
+
+### Importing Exported Content
+
+#### Import Slot Configuration
+
+```
+On start of layout
+  ├─ Variable: load formationData = JSON.parse(LoadedFileContent("formations/defensive_v.json"))
+  ├─ Guard.AI -> Load Slot Positions from JSON -> "defense_squad", "stance", JSON.stringify(formationData.stance)
+  └─ Guard members automatically reserve slots from loaded formation
+```
+
+#### Import Task Network
+
+```
+On start of layout
+  ├─ Variable: load networkData = JSON.parse(LoadedFileContent("networks/guard_basic.json"))
+  ├─ Manager -> Register task network from JSON -> networkData.networkId, JSON.stringify(networkData)
+  └─ Agents can now use the imported network by setting Agent Type
+```
+
+### Best Practices
+
+- **Version Your Content**: Include version field in exported JSON for compatibility tracking.
+- **Name Slots Descriptively**: Use slot IDs that describe tactical roles (e.g., "sniper_nest" not "slot_1").
+- **Document Task Networks**: Add description field to each task for clarity.
+- **Test Before Exporting**: Validate formations and networks in-game before committing to library.
+- **Share Across Projects**: Store content libraries in shared Git repositories or cloud storage for team reuse.
+- **Parameterize Positions**: Use relative offsets so formations can be reused in different areas without manual adjustment.
 
 ## 10. Actions Reference
 

@@ -91,6 +91,13 @@ export default function (parentClass) {
       this._coordLastSlotType = "";
       this._coordLastSlotId = "";
 
+      this._slotBuilderSquadId = "";
+      this._slotBuilderSlotType = "";
+      this._slotBuilderSlots = [];
+
+      this._taskNetworkBuilderId = "";
+      this._taskNetworkBuilderTasks = [];
+
       this.events = {};
 
       this._setTicking(true);
@@ -942,6 +949,112 @@ export default function (parentClass) {
         this._processCoordinationSquad(first, now);
         COORD.passesThisTick = 1;
       }
+    }
+
+    _initializeSlotBuilder(squadId, slotType) {
+      const sid = this._normalizeSquadId(squadId);
+      const st = String(slotType ?? "").trim();
+      if (!sid || !st) {
+        return;
+      }
+      this._slotBuilderSquadId = sid;
+      this._slotBuilderSlotType = st;
+      this._slotBuilderSlots = [];
+    }
+
+    _addSlotToBuilder(squadId, slotType, slotId, x, y) {
+      const sid = this._normalizeSquadId(squadId);
+      const st = String(slotType ?? "").trim();
+      const slId = String(slotId ?? "").trim();
+      if (!sid || !st || !slId || sid !== this._slotBuilderSquadId || st !== this._slotBuilderSlotType) {
+        return;
+      }
+      this._slotBuilderSlots.push({
+        slotId: slId,
+        x: Number(x) || 0,
+        y: Number(y) || 0,
+      });
+    }
+
+    _loadSlotSetFromBuilder(squadId, slotType) {
+      const sid = this._normalizeSquadId(squadId);
+      const st = String(slotType ?? "").trim();
+      if (!sid || !st || sid !== this._slotBuilderSquadId || st !== this._slotBuilderSlotType) {
+        return;
+      }
+      if (this._slotBuilderSlots.length === 0) {
+        return;
+      }
+      const squad = this._getOrCreateSquad(sid);
+      if (!squad) {
+        return;
+      }
+      if (!squad.slots.has(st)) {
+        squad.slots.set(st, new Map());
+      }
+      const slotsOfType = squad.slots.get(st);
+      for (const slot of this._slotBuilderSlots) {
+        slotsOfType.set(slot.slotId, {
+          slotId: slot.slotId,
+          x: slot.x,
+          y: slot.y,
+          ownedBy: 0,
+          expiresAt: 0,
+        });
+      }
+      this._markSquadDirty(sid);
+      this._slotBuilderSquadId = "";
+      this._slotBuilderSlotType = "";
+      this._slotBuilderSlots = [];
+    }
+
+    _initializeTaskNetworkBuilder(networkId) {
+      const nid = String(networkId ?? "").trim();
+      if (!nid) {
+        return;
+      }
+      this._taskNetworkBuilderId = nid;
+      this._taskNetworkBuilderTasks = [];
+    }
+
+    _addTaskToNetworkBuilder(taskId, networkId, description, taskType) {
+      const nid = String(networkId ?? "").trim();
+      const tid = String(taskId ?? "").trim();
+      const desc = String(description ?? "").trim();
+      const ttype = String(taskType ?? "primitive").trim();
+      if (!nid || !tid || nid !== this._taskNetworkBuilderId) {
+        return;
+      }
+      this._taskNetworkBuilderTasks.push({
+        taskId: tid,
+        description: desc,
+        taskType: ttype,
+      });
+    }
+
+    _loadTaskNetworkFromBuilder(networkId, exportKey) {
+      const nid = String(networkId ?? "").trim();
+      const ek = String(exportKey ?? "").trim();
+      if (!nid || !ek || nid !== this._taskNetworkBuilderId) {
+        return;
+      }
+      if (this._taskNetworkBuilderTasks.length === 0) {
+        return;
+      }
+      const networkObj = {
+        networkId: nid,
+        tasks: this._taskNetworkBuilderTasks.map((t) => ({
+          id: t.taskId,
+          description: t.description,
+          type: t.taskType,
+        })),
+        createdAt: new Date().toISOString(),
+        version: "1.0",
+      };
+      const jsonStr = JSON.stringify(networkObj);
+      this._setWorldState(ek, jsonStr);
+      this._taskNetworkBuilderId = "";
+      this._taskNetworkBuilderTasks = [];
     }
 
     _updatePlanning(dt) {

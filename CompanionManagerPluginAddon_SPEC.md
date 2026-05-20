@@ -45,6 +45,9 @@ Each registered agent tracks:
 
 ## 4. Planning Lifecycle Contract
 1. Companion registers required task network(s) and utility scorer(s).
+  - **Recommended path (Behavior-driven)**: Use task network builder ACEs on behavior addon (Initialize → Add → Load) to compose networks declaratively, export as JSON from world-state keys, then register with manager.
+  - **Manager-direct path (Manager Builder)**: Use manager's native builder ACEs (BeginTaskNetwork → Add* → RegisterTaskNetwork) to define networks directly on manager.
+  - **Legacy-compatible path**: JSON registration via `Setup: Register ...` actions (both behavior and manager support this).
 2. Companion provides world-state inputs continuously.
 3. Companion requests or invalidates plans based on gameplay events.
 4. Manager emits task/plan/alert triggers.
@@ -68,13 +71,21 @@ Each registered agent tracks:
 - write/read squad shared keys
 - invalidate/request plans for whole squad
 
-### Slot operations
-- define slot positions by type and ID
+### Slot operations (Two setup paths)
+
+**Traditional path (raw JSON or action-by-action):**
+- define slot positions by type and ID via action
 - reserve/release slot ownership with TTL
 - auto-assign nearest free slot
 - expired reservations auto-release
 
-Companion should treat slot ownership as exclusive while reservation is valid.
+**Recommended path (Slot Builder ACEs):**
+- Use behavior addon slot builder ACEs: Initialize Slot Builder → Add Slot to Builder → Load Slot Set from Builder
+- Compose slot maps declaratively without JSON syntax errors
+- Export to JSON for reuse across projects
+- Can be stored in project libraries and version-controlled
+
+Companion should treat slot ownership as exclusive while reservation is valid. Slot builder outputs integrate seamlessly with existing slot reservation/release/auto-assign operations.
 
 ## 7. Performance Contract
 Manager update behavior is configurable by properties/actions:
@@ -96,12 +107,42 @@ Manager persists:
 Companion should keep world-state schema stable across versions when relying on saves.
 
 ## 9. Scripting API Surface (Single Source = ACE Exposure)
-The script API comes from ACE-exposed methods.
+The script API comes from ACE-exposed methods. Both behavior addon and manager plugin expose methods; prefer the behavior addon for content composition, manager for registration and control.
 
-### Write/control methods (actions)
-Examples:
+### Behavior Addon - Content Builders (Composition)
+
+**Slot Builder ACEs** (Coordination category):
+- InitializeSlotBuilder(squadId, slotType) - Start slot collection
+- AddSlotToBuilder(squadId, slotType, slotId, x, y) - Add one slot
+- LoadSlotSetFromBuilder(squadId, slotType) - Commit and export to JSON
+
+**Task Network Builder ACEs** (Setup category):
+- InitializeTaskNetworkBuilder(networkId) - Start network definition
+- AddTaskToNetworkBuilder(taskId, networkId, description, taskType) - Add task with type (primitive, composite, method)
+- LoadTaskNetworkFromBuilder(networkId, exportKey) - Commit and export to JSON string via world state
+
+### Manager Plugin - Control Methods (Manager-direct approach)
+
+**Manager Builder methods** (still available for direct registration):
+- BeginTaskNetwork(agentType, rootTask)
+- ClearTaskNetwork(agentType)
+- AddCompoundTask(agentType, taskName)
+- AddPrimitiveTask(agentType, taskName, primitiveId)
+- AddMethod(agentType, taskName, methodId)
+- AddMethodCondition(agentType, taskName, methodId, key, op, value)
+- AddMethodSubtask(agentType, taskName, methodId, subtaskTaskName)
+- SetMethodUtilityScorer(agentType, taskName, methodId, scorerId)
+- RegisterTaskNetwork(agentType)
+- BeginUtilityScorer(scorerId, aggregation)
+- ClearUtilityScorer(scorerId)
+- AddUtilityInputLinear(scorerId, worldStateKey, weight, invert, x1, y1, x2, y2)
+- RegisterUtilityScorer(scorerId)
+
+Legacy JSON setup examples (still supported by both addons):
 - RegisterTaskNetwork(agentType, networkJson)
 - RegisterUtilityScorer(scorerJson)
+
+Runtime control examples:
 - SetWorldStateKey(agentUID, key, value)
 - SetGlobalStateKey(key, value)
 - RequestPlan(agentUID)
@@ -132,8 +173,10 @@ Examples:
 - dispatch(tag)
 
 Notes:
-- Combo params are passed as numeric indices in script calls.
-- Underscore-prefixed methods are internal and unstable.
+- **Preferred setup path for large projects**: Use behavior addon slot/task network builders to compose content declaratively, export as JSON, then import into manager or store as project libraries.
+- **For immediate scripting**: Manager plugin builder methods remain available for direct network registration without going through behavior addon.
+- Combo params should use the ACE-exposed value shape for that action (for example `"interval_sec"`, `"request"`, `"minimum"`, or `"1"` for yes/no combos).
+- Underscore-prefixed methods are internal and unstable. Use only ACE-exposed public methods.
 
 ## 10. Trigger/Event Contract
 Primary triggers companion should consume:
@@ -159,14 +202,63 @@ Companion addon should:
 - report task completion/failure promptly
 - avoid stale slot locks by honoring reservation lifecycle
 
-## 12. Integration Pattern Example
-```javascript
-const manager = runtime.objects.TactiCoreManager.getFirstInstance();
+## 12. Integration Pattern Examples
 
-// setup
-manager.RegisterTaskNetwork("guard", guardNetworkJson);
-manager.RegisterUtilityScorer(guardCombatScorerJson);
-manager.RegisterUtilityScorer(guardRetreatScorerJson);
+### Pattern A: Behavior Addon Builders (Recommended for teams/large projects)
+```javascript
+const guard = runtime.objects.Guard.getFirstInstance();
+const guardAI = guard.behaviors.UtilityDrivenHTNAgent;
+const manager = runtime.objects.Manager.getFirstInstance();
+
+// Compose task network using behavior addon builders
+guardAI.InitializeTaskNetworkBuilder("guard");
+guardAI.AddTaskToNetworkBuilder("idle", "guard", "Stand and wait", "primitive");
+guardAI.AddTaskToNetworkBuilder("patrol", "guard", "Walk patrol route", "primitive");
+guardAI.AddTaskToNetworkBuilder("chase", "guard", "Pursue target", "primitive");
+guardAI.LoadTaskNetworkFromBuilder("guard", "exportedNetwork");
+
+// Export JSON from world state
+const networkJSON = guardAI.WorldState("exportedNetwork");
+console.log("Exported network:", networkJSON);
+// Store in project library or send to manager
+
+// Register with manager (via JSON or directly)
+const networkData = JSON.parse(networkJSON);
+manager.RegisterTaskNetwork("guard", JSON.stringify(networkData));
+
+// Compose slot formation using behavior addon builders
+guardAI.InitializeSlotBuilder("guard_squad", "stance");
+guardAI.AddSlotToBuilder("guard_squad", "stance", "point", 0, 0);
+guardAI.AddSlotToBuilder("guard_squad", "stance", "left_wing", -150, 100);
+guardAI.AddSlotToBuilder("guard_squad", "stance", "right_wing", 150, 100);
+guardAI.LoadSlotSetFromBuilder("guard_squad", "stance");
+
+// Slots are now available for auto-assignment
+guardAI.AutoAssignNearestFreeSlot(guard.uid, "guard_squad", "stance", guard.x, guard.y, 500, 1.5);
+```
+
+### Pattern B: Manager Direct Builders (For immediate setup)
+```javascript
+const manager = runtime.objects.Manager.getFirstInstance();
+
+// Setup utilities and networks directly on manager
+manager.BeginUtilityScorer("guard_combat", "weighted_sum");
+manager.AddUtilityInputLinear("guard_combat", "targetVisible", 1, "0", 0, 0, 1, 1);
+manager.RegisterUtilityScorer("guard_combat");
+
+manager.BeginTaskNetwork("guard", "guard_root");
+manager.AddCompoundTask("guard", "guard_root");
+manager.AddPrimitiveTask("guard", "chase_target", "chase");
+manager.AddMethod("guard", "guard_root", "m_chase");
+manager.AddMethodCondition("guard", "guard_root", "m_chase", "targetVisible", "eq", 1);
+manager.SetMethodUtilityScorer("guard", "guard_root", "m_chase", "guard_combat");
+manager.AddMethodSubtask("guard", "guard_root", "m_chase", "chase_target");
+manager.RegisterTaskNetwork("guard");
+```
+
+### Pattern C: Runtime Management (Both patterns support this)
+```javascript
+const manager = runtime.objects.Manager.getFirstInstance();
 
 // per-tick context feed
 function updateAgentContext(uid, data) {
@@ -189,17 +281,63 @@ manager.on("OnTaskFailed", () => {
 });
 ```
 
+### Pattern D: Legacy JSON (Still supported, both addons)
+```javascript
+const manager = runtime.objects.Manager.getFirstInstance();
+
+// JSON registration remains valid
+manager.RegisterTaskNetwork("guard", guardNetworkJson);
+manager.RegisterUtilityScorer(guardCombatScorerJson);
+```
+
 ## 13. Compatibility and Versioning Guidance
 - Treat task IDs, world-state key names, and squad key names as API contracts.
 - Add new keys/behaviors in backward-compatible ways.
 - Do not depend on manager internal underscore methods.
 - Prefer ACE-exposed methods only.
 
-## 14. Companion Checklist
+## 15. Content Libraries and Export Workflow
+
+Behavior addon builders enable creation of reusable, version-controlled content libraries:
+
+1. **Compose**: Use slot/task network builder ACEs in behavior addon to define content
+2. **Export**: Extract JSON from world-state keys after builder commit
+3. **Store**: Save JSON files in project `assets/ai_content/` directories
+4. **Organize**: Group formations, routes, networks, tactics by purpose
+5. **Share**: Commit to Git and share across team projects
+6. **Import**: Load JSON and register with manager at runtime
+
+**Example library structure:**
+```
+assets/ai_content/
+├── formations/
+│   ├── defensive_v.json
+│   ├── flanking_triangle.json
+│   └── ambush_8ring.json
+├── routes/
+│   ├── patrol_square.json
+│   └── invasion_entry_points.json
+├── networks/
+│   ├── guard_basic.json
+│   ├── enemy_combat.json
+│   └── boss_difficulty_1.json
+└── tactics/
+    ├── siege_fire_rotation.json
+    └── extraction_360_coverage.json
+```
+
+See Guide.md Section 9C for comprehensive content creation examples.
+
+## 16. Companion Checklist
+- Register scorers before any task-network method references those scorer IDs.
 - Register networks/scorers before requesting plans.
+- **Recommended**: Use behavior addon builders for content composition in team projects.
+- Manager builder methods remain available for direct scripting when needed.
+- Export builder outputs to JSON for team reuse and version control.
 - Register all participating agents with correct agentType.
 - Feed required world-state keys every update window.
 - Subscribe to task/alert/squad triggers.
 - Execute selected tasks in companion runtime.
 - Mark complete/failed outcomes.
 - Validate performance settings for target platform.
+- Validate exported JSON before registering with manager.
