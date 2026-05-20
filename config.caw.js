@@ -14,8 +14,7 @@ export const minConstructVersion = undefined;
 export const author = "SalmanShh";
 export const website = "https://www.construct.net";
 export const documentation = "https://www.construct.net";
-export const description =
-  "Per-instance AI behavior that drives planning, signals, and task state for attached objects.";
+export const description = "Give any object smart AI, attach this behavior and it automatically registers with the HTN Manager, runs utility-scored planning, tracks alert tiers, reacts to sight/sound/damage signals, and fires clean event-sheet triggers for each task. No AI boilerplate, no per-instance glue code. Supports squads, slot-based tactical coordination, temporary task overrides, save/load, and performance scaling for any game size.";
 export const category = ADDON_CATEGORY.ATTRIBUTES;
 
 export const hasDomside = false;

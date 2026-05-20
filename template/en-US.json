@@ -5,7 +5,7 @@
     "behaviors": {
       "salmanshh_dhtn_agent": {
         "name": "Utility-Driven HTN (Hierarchical Task Network) Agent",
-        "description": "Per-instance AI behavior that drives planning, signals, and task state for attached objects.",
+        "description": "Give any object smart AI, attach this behavior and it automatically registers with the HTN Manager, runs utility-scored planning, tracks alert tiers, reacts to sight/sound/damage signals, and fires clean event-sheet triggers for each task. No AI boilerplate, no per-instance glue code. Supports squads, slot-based tactical coordination, temporary task overrides, save/load, and performance scaling for any game size.",
         "help-url": "https://www.construct.net",
         "aceCategories": {
           "Coordination": "Coordination",
