@@ -9,7 +9,7 @@ export const config = {
     { id: "taskId", name: "Task ID", desc: "Unique identifier for this primitive task (e.g., 'patrol', 'chase', 'idle').", type: "string", initialValue: '"task_1"' },
     { id: "networkId", name: "Network ID", desc: "Must match the Initialize call.", type: "string", initialValue: '"custom_network"' },
     { id: "description", name: "Description", desc: "Human-readable task description for debugging.", type: "string", initialValue: '"Perform task"' },
-    { id: "taskType", name: "Task Type", desc: "primitive, composite, or method.", type: "combo", initialValue: '"primitive"', items: [{ primitive: "Primitive" }, { composite: "Composite" }, { method: "Method" }] },
+    { id: "taskType", name: "Task Type", desc: "Pick Primitive for a task that directly does something (like Move or Attack). Pick Composite for a high-level goal that is broken into smaller tasks. Pick Method for the rule that decides which subtasks to use based on the current world state.", type: "combo", initialValue: "primitive", items: [{ primitive: "Primitive" }, { composite: "Composite" }, { method: "Method" }] },
   ],
 };
 

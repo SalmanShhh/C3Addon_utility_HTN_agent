@@ -1,11 +1,16 @@
 <img src="./src/icon.svg" width="100" /><br>
 # Utility-Driven HTN (Hierarchical Task Network) Agent
 <i>Give any object smart AI, attach this behavior and it automatically registers with the HTN Manager, runs utility-scored planning, tracks alert tiers, reacts to sight/sound/damage signals, and fires clean event-sheet triggers for each task. No AI boilerplate, no per-instance glue code. Supports squads, slot-based tactical coordination, temporary task overrides, save/load, and performance scaling for any game size.</i> <br>
-### Version 1.1.1.0
+### Version 1.1.1.1
 
-[<img src="https://placehold.co/200x50/4493f8/FFF?text=Download&font=montserrat" width="200"/>](https://github.com/SalmanShhh/C3Addon_utility_driven_htn_hierarchical_task_network_agent/releases/download/salmanshh_DHTN_Agent-1.1.1.0.c3addon/salmanshh_DHTN_Agent-1.1.1.0.c3addon)
+[<img src="https://placehold.co/200x50/4493f8/FFF?text=Download&font=montserrat" width="200"/>](https://github.com/SalmanShhh/C3Addon_utility_driven_htn_hierarchical_task_network_agent/releases/download/salmanshh_DHTN_Agent-1.1.1.1.c3addon/salmanshh_DHTN_Agent-1.1.1.1.c3addon)
 <br>
 <sub> [See all releases](https://github.com/SalmanShhh/C3Addon_utility_driven_htn_hierarchical_task_network_agent/releases) </sub> <br>
+
+#### What's New in 1.1.1.1
+- **Fixed:** Fix Network builder ACE
+
+<sub>[View full changelog](#changelog)</sub>
 
 ---
 <b><u>Author:</u></b> SalmanShh <br>
@@ -179,6 +184,9 @@ npm run dev
 
 ---
 ## Changelog
+
+**1.1.1.1**
+- **Fixed:** Fix Network builder ACE
 
 **1.1.1.0**
 

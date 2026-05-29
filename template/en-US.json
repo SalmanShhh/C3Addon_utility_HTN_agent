@@ -513,7 +513,7 @@
               },
               "taskType": {
                 "name": "Task Type",
-                "desc": "primitive, composite, or method.",
+                "desc": "Pick Primitive for a task that directly does something (like Move or Attack). Pick Composite for a high-level goal that is broken into smaller tasks. Pick Method for the rule that decides which subtasks to use based on the current world state.",
                 "items": {
                   "primitive": "Primitive",
                   "composite": "Composite",
